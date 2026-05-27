@@ -58,30 +58,20 @@ Status Switch::Init() {
 
    bool current_state = GetInputState();
 
-    if (value && !current_state) {
-        SetOutputState(true, "HAP");
-        mgos_set_timer(
-            300,
-            0,
-            [](void *arg) {
-                auto sw = (Switch *) arg;
-                sw->SetOutputState(false, "HAP");
-            },
-            this);
-    }
+    if (value != current_state) {
+    uint32_t hold = value ? 300 : 3000;
 
-    if (!value && current_state) {
-        SetOutputState(true, "HAP");
-        mgos_set_timer(
-            3000,
-            0,
-            [](void *arg) {
-                auto sw = (Switch *) arg;
-                sw->SetOutputState(false, "HAP");
-            },
-            this);
-    }
+    SetOutputState(true, "HAP");
 
+    mgos_set_timer(
+        hold,
+        0,
+        [](void *arg) {
+            auto sw = (Switch *) arg;
+            sw->SetOutputState(false, "HAP");
+        },
+        this);
+}
     return kHAPError_None;
 },
       kHAPCharacteristicDebugDescription_On);
