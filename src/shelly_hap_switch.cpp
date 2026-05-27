@@ -48,7 +48,7 @@ Status Switch::Init() {
       iid++, &kHAPCharacteristicType_On,
       [this](HAPAccessoryServerRef *, const HAPBoolCharacteristicReadRequest *,
              bool *value) {
-        *value = in_->GetState() ^ cfg_->hk_state_inverted;
+       *value = GetInputState() ^ cfg_->hk_state_inverted;
         return kHAPError_None;
       },
       true /* supports_notification */,
@@ -56,7 +56,7 @@ Status Switch::Init() {
        const HAPBoolCharacteristicWriteRequest *,
        bool value) {
 
-    bool current_state = in_->GetState();
+   bool current_state = GetInputState();
 
     if (value && !current_state) {
         SetOutputState(true, "HAP");
