@@ -324,10 +324,17 @@ bool ShellySwitch::GetInputState() const {
 
 void ShellySwitch::InputEventHandler(Input::Event ev, bool state) {
   InMode in_mode = static_cast<InMode>(cfg_->in_mode);
-  if (in_mode == InMode::kDetached) {
-    // Nothing to do
+ if (in_mode == InMode::kDetached) {
+    // Nu schimbăm output-ul,
+    // dar notificăm HomeKit când se schimbă input-ul.
+
+    if (ev == Input::Event::kChange) {
+        for (auto *c : state_notify_chars_) {
+            c->RaiseEvent();
+        }
+    }
     return;
-  }
+}
   switch (ev) {
     case Input::Event::kChange: {
       switch (static_cast<InMode>(cfg_->in_mode)) {
