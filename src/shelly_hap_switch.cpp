@@ -48,15 +48,42 @@ Status Switch::Init() {
       iid++, &kHAPCharacteristicType_On,
       [this](HAPAccessoryServerRef *, const HAPBoolCharacteristicReadRequest *,
              bool *value) {
-        *value = out_->GetState() ^ cfg_->hk_state_inverted;
+        *value = in_->GetState() ^ cfg_->hk_state_inverted;
         return kHAPError_None;
       },
       true /* supports_notification */,
-      [this](HAPAccessoryServerRef *, const HAPBoolCharacteristicWriteRequest *,
-             bool value) {
-        SetOutputState(value ^ cfg_->hk_state_inverted, "HAP");
-        return kHAPError_None;
-      },
+     [this](HAPAccessoryServerRef *,
+       const HAPBoolCharacteristicWriteRequest *,
+       bool value) {
+
+    bool current_state = in_->GetState();
+
+    if (value && !current_state) {
+        SetOutputState(true, "HAP");
+        mgos_set_timer(
+            300,
+            0,
+            [](void *arg) {
+                auto sw = (Switch *) arg;
+                sw->SetOutputState(false, "HAP");
+            },
+            this);
+    }
+
+    if (!value && current_state) {
+        SetOutputState(true, "HAP");
+        mgos_set_timer(
+            3000,
+            0,
+            [](void *arg) {
+                auto sw = (Switch *) arg;
+                sw->SetOutputState(false, "HAP");
+            },
+            this);
+    }
+
+    return kHAPError_None;
+},
       kHAPCharacteristicDebugDescription_On);
   state_notify_chars_.push_back(on_char);
   AddChar(on_char);
