@@ -148,7 +148,7 @@ Features that are not yet supported:
 
         * Shelly Plus I4 AC & DC: `http://A.B.C.D/ota?url=http://rojer.me/files/shelly/shelly-homekit-ShellyPlusI4.zip`
 
-        * Shelly Plus UNI: `http://A.B.C.D/ota?url=http://rojer.me/files/shelly/shelly-homekit-ShellyPlusUni.zip`
+        * Shelly Plus UNI: `http://A.B.C.D/ota?url=http://rojer.me/files/shelly/shelly-homekit-ShellyPlusUni.zip` - updated
 
       * Gen 3 Devices
    
