@@ -48,7 +48,7 @@ Status Switch::Init() {
       iid++, &kHAPCharacteristicType_On,
       [this](HAPAccessoryServerRef *, const HAPBoolCharacteristicReadRequest *,
              bool *value) {
-       *value = GetInputState() ^ cfg_->hk_state_inverted;
+       *value = out_->GetState() ^ cfg_->hk_state_inverted;
         return kHAPError_None;
       },
       true /* supports_notification */,
