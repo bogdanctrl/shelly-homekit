@@ -45,31 +45,44 @@ Status Switch::Init() {
   AddNameChar(iid++, cfg_->name);
   // On
   auto *on_char = new mgos::hap::BoolCharacteristic(
-      iid++, &kHAPCharacteristicType_On,
-      [this](HAPAccessoryServerRef *, const HAPBoolCharacteristicReadRequest *,
-             bool *value) {
-       *value = GetInputState() ^ cfg_->hk_state_inverted;
-        return kHAPError_None;
-      },
-      true /* supports_notification */,
-     [this](HAPAccessoryServerRef *,
-       const HAPBoolCharacteristicWriteRequest *,
-       bool value) {
-uint32_t hold = value ? 300 : 3000;
+    iid++, &kHAPCharacteristicType_On,
 
-SetOutputState(true, "HAP");
-
-mgos_set_timer(
-    hold,
-    0,
-    [](void *arg) {
-        auto sw = (Switch *) arg;
-        sw->SetOutputState(false, "HAP");
+    [this](HAPAccessoryServerRef *,
+           const HAPBoolCharacteristicReadRequest *,
+           bool *value) {
+      *value = GetInputState() ^ cfg_->hk_state_inverted;
+      return kHAPError_None;
     },
-    this);
-       
-    return kHAPError_None;
-},
+
+    true /* supports_notification */,
+
+    [this](HAPAccessoryServerRef *,
+           const HAPBoolCharacteristicWriteRequest *,
+           bool value) {
+
+      // Switch 1 = Diffuser LED
+      if (id() == 1) {
+        SetOutputState(value ^ cfg_->hk_state_inverted, "HAP");
+        return kHAPError_None;
+      }
+
+      // Switch 2 = Diffuser
+      uint32_t hold = value ? 300 : 3000;
+
+      SetOutputState(true, "HAP");
+
+      mgos_set_timer(
+          hold,
+          0,
+          [](void *arg) {
+            auto sw = (Switch *) arg;
+            sw->SetOutputState(false, "HAP");
+          },
+          this);
+
+      return kHAPError_None;
+    },
+  
       kHAPCharacteristicDebugDescription_On);
   state_notify_chars_.push_back(on_char);
   AddChar(on_char);
