@@ -1678,6 +1678,7 @@ conds:
         - src/DS18XXX
         - src/DHT
         - src/ShellyUNI
+        - src/ShellyPlusUni
       libs:
         - location: https://github.com/mongoose-os-libs/onewire
         - location: https://github.com/mongoose-os-libs/dht
@@ -1701,6 +1702,7 @@ conds:
         SENSOR_GPIO: 13
         PRODUCT_HW_REV: "0.1.4"
         STOCK_FW_MODEL: PlusUni
+        PLUS_UNI_DIFFUSER: 1
         MAX_NUM_HAP_SESSIONS: 16
       config_schema:
         - ["device.id",    "ShellyPlusUni-????????????"]
