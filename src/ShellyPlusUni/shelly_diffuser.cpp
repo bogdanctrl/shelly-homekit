@@ -116,10 +116,9 @@ Status DiffuserSwitch::Init() {
 }
 
 StatusOr<std::string> DiffuserSwitch::GetInfo() const {
-  return mgos::SPrintf(
-      "st:%d in_st:%d inm:%d ininv:%d pending:%d target:%d", ReadState(),
-      GetInputState(), cfg_->in_mode, cfg_->in_inverted, command_pending_,
-      pending_state_);
+  return mgos::SPrintf("st:%d in_st:%d inm:%d ininv:%d pending:%d target:%d",
+                       ReadState(), GetInputState(), cfg_->in_mode,
+                       cfg_->in_inverted, command_pending_, pending_state_);
 }
 
 StatusOr<std::string> DiffuserSwitch::GetInfoJSON() const {
@@ -135,8 +134,8 @@ StatusOr<std::string> DiffuserSwitch::GetInfoJSON() const {
       cfg_->hk_state_inverted, cfg_->valve_type, cfg_->in_mode,
       cfg_->in_inverted, cfg_->initial_state, ReadState(), cfg_->auto_off,
       cfg_->auto_off_delay, cfg_->state_led_en, cfg_->out_inverted, hdim,
-      command_pending_, pending_state_, kDiffuserOnPressMs,
-      kDiffuserOffPressMs, true);
+      command_pending_, pending_state_, kDiffuserOnPressMs, kDiffuserOffPressMs,
+      true);
 }
 
 Status DiffuserSwitch::SetState(const std::string &state_json) {
@@ -200,8 +199,7 @@ Status DiffuserSwitch::RequestState(bool state, const char *source) {
   // is rejected until the current physical button press has completed.
   if (command_pending_) {
     if (pending_state_ == state) return Status::OK();
-    return mgos::Errorf(STATUS_UNAVAILABLE,
-                        "diffuser command already pending");
+    return mgos::Errorf(STATUS_UNAVAILABLE, "diffuser command already pending");
   }
 
   const bool current_state = ReadState();
@@ -232,9 +230,9 @@ Status DiffuserSwitch::RequestState(bool state, const char *source) {
   pulse_duration_timer_.Reset(press_ms, 0);
   command_timeout_timer_.Reset(kCommandTimeoutMs, 0);
   LOG(LL_INFO,
-      ("Diffuser: requested %s; %s button pulse for %d ms (%s)",
-       OnOff(state), state ? "OUT1 only" : "OUT1 + OUT2 simultaneously",
-       press_ms, source ? source : ""));
+      ("Diffuser: requested %s; %s button pulse for %d ms (%s)", OnOff(state),
+       state ? "OUT1 only" : "OUT1 + OUT2 simultaneously", press_ms,
+       source ? source : ""));
   return Status::OK();
 }
 
