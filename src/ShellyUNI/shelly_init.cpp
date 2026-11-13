@@ -40,12 +40,10 @@ void CreatePeripherals(std::vector<std::unique_ptr<Input>> *inputs,
                        std::unique_ptr<TempSensor> *sys_temp) {
 #ifdef PLUS_UNI_DIFFUSER
   // Diffuser wiring on Shelly Plus Uni:
-  //   OUT1 / GPIO19 -> main button contact
-  //   OUT2 / GPIO21 -> LED-button contact; used together with OUT1 for OFF
+  //   OUT1 / GPIO19 -> single ON/OFF button contact pair
   //   IN2  / GPIO38 -> atomizer state feedback (the authoritative state)
-  // IN1 (GPIO37) is not used by the diffuser state logic.
+  // OUT2 / GPIO21 and IN1 / GPIO37 are not used by diffuser mode.
   outputs->emplace_back(new OutputPin(1, RELAY1_GPIO, 1));
-  outputs->emplace_back(new OutputPin(2, RELAY2_GPIO, 1));
   auto *in2 = new InputPin(2, SWITCH2_GPIO, 1, MGOS_GPIO_PULL_NONE, false);
   in2->Init();
   inputs->emplace_back(in2);
@@ -82,12 +80,12 @@ void CreateComponents(std::vector<std::unique_ptr<Component>> *comps,
                       std::vector<std::unique_ptr<mgos::hap::Accessory>> *accs,
                       HAPAccessoryServerRef *svr) {
 #ifdef PLUS_UNI_DIFFUSER
-  // The diffuser has one HomeKit switch. Its On state is read from IN2.
-  // ON pulses OUT1 briefly; OFF pulses OUT1 and OUT2 together for 3 seconds.
+  // The diffuser has one HomeKit switch. Its On state is read only from IN2.
+  // Both ON and OFF use the same physical button via OUT1 (100 ms / 3000 ms).
   auto *sw_cfg = (struct mgos_config_sw *) mgos_sys_config_get_sw1();
   if (sw_cfg->enable) {
-    std::unique_ptr<hap::DiffuserSwitch> diffuser(new hap::DiffuserSwitch(
-        1, FindInput(2), FindOutput(1), FindOutput(2), sw_cfg));
+    std::unique_ptr<hap::DiffuserSwitch> diffuser(
+        new hap::DiffuserSwitch(1, FindInput(2), FindOutput(1), sw_cfg));
     auto st = diffuser->Init();
     if (!st.ok()) {
       LOG(LL_ERROR,

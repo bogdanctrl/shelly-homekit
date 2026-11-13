@@ -24,8 +24,8 @@ namespace shelly {
 namespace hap {
 namespace {
 
-// ON is a short press of the main button. OFF requires both the main button
-// and the LED-button contacts to be shorted simultaneously for three seconds.
+// The diffuser uses one physical button: a short press turns it ON, while a
+// three-second press turns it OFF.
 constexpr int kDiffuserOnPressMs = 100;
 constexpr int kDiffuserOffPressMs = 3000;
 
@@ -36,11 +36,9 @@ constexpr int kCommandTimeoutMs = 15000;
 }  // namespace
 
 DiffuserSwitch::DiffuserSwitch(int id, Input *feedback_in, Output *button_out,
-                               Output *led_button_out,
                                struct mgos_config_sw *cfg)
     : ShellySwitch(id, feedback_in, button_out, nullptr, nullptr, cfg),
       feedback_in_(feedback_in),
-      led_button_out_(led_button_out),
       pulse_duration_timer_(
           std::bind(&DiffuserSwitch::ButtonPulseCompleteCB, this)),
       command_timeout_timer_(
@@ -52,23 +50,20 @@ Status DiffuserSwitch::Init() {
     LOG(LL_INFO, ("'%s' is disabled", cfg_->name));
     return Status::OK();
   }
-  if (feedback_in_ == nullptr || out_ == nullptr ||
-      led_button_out_ == nullptr) {
+  if (feedback_in_ == nullptr || out_ == nullptr) {
     return mgos::Errorf(
         STATUS_INVALID_ARGUMENT,
-        "diffuser feedback input and both button outputs are required");
+        "diffuser feedback input and button output are required");
   }
 
   // IN2 is the only source of truth for HomeKit's On characteristic.
   feedback_in_->SetInvert(cfg_->in_inverted);
   last_feedback_state_ = ReadState();
 
-  // OUT1 and OUT2 are momentary button actuators, never a persistent
-  // representation of diffuser state. Always leave both inactive after boot.
+  // OUT1 is a momentary button actuator, never a representation of diffuser
+  // state. Leave it inactive after boot.
   out_->SetInvert(cfg_->out_inverted);
-  led_button_out_->SetInvert(cfg_->out_inverted);
   out_->SetState(false, "diffuser_init");
-  led_button_out_->SetState(false, "diffuser_init");
 
   const auto handler_id = feedback_in_->AddHandler(
       std::bind(&DiffuserSwitch::FeedbackEventHandler, this, _1, _2));
@@ -108,10 +103,9 @@ Status DiffuserSwitch::Init() {
   AddChar(on_char_);
 
   LOG(LL_INFO,
-      ("Diffuser switch initialized: feedback input %d, main button output "
-       "%d, LED-button output %d, state %s",
-       feedback_in_->id(), out_->id(), led_button_out_->id(),
-       OnOff(last_feedback_state_)));
+      ("Diffuser switch initialized: feedback input %d, button output %d, "
+       "state %s",
+       feedback_in_->id(), out_->id(), OnOff(last_feedback_state_)));
   return Status::OK();
 }
 
@@ -135,7 +129,7 @@ StatusOr<std::string> DiffuserSwitch::GetInfoJSON() const {
       cfg_->in_inverted, cfg_->initial_state, ReadState(), cfg_->auto_off,
       cfg_->auto_off_delay, cfg_->state_led_en, cfg_->out_inverted, hdim,
       command_pending_, pending_state_, kDiffuserOnPressMs, kDiffuserOffPressMs,
-      true);
+      false);
 }
 
 Status DiffuserSwitch::SetState(const std::string &state_json) {
@@ -174,6 +168,14 @@ void DiffuserSwitch::FeedbackEventHandler(Input::Event ev, bool state) {
 }
 
 void DiffuserSwitch::ButtonPulseCompleteCB() {
+  // Release the one physical button after the requested press duration.
+  if (out_ != nullptr) {
+    const auto st = out_->SetState(false, "diffuser_button_release");
+    if (!st.ok()) {
+      LOG(LL_ERROR,
+          ("Failed to release diffuser button: %s", st.ToString().c_str()));
+    }
+  }
   pulse_complete_ = true;
   TryFinishCommand();
 }
@@ -182,6 +184,8 @@ void DiffuserSwitch::CommandTimeoutCB() {
   if (!command_pending_) return;
   LOG(LL_WARN, ("Diffuser did not confirm requested %s state through IN2",
                 OnOff(pending_state_)));
+  // Fail safe: never leave the simulated button held after a timeout.
+  if (out_ != nullptr) out_->SetState(false, "diffuser_command_timeout");
   command_pending_ = false;
   pulse_duration_timer_.Clear();
 }
@@ -202,37 +206,32 @@ Status DiffuserSwitch::RequestState(bool state, const char *source) {
     return mgos::Errorf(STATUS_UNAVAILABLE, "diffuser command already pending");
   }
 
-  const bool current_state = ReadState();
-  if (current_state == state) return Status::OK();
+  // IN2 is authoritative. Never send a button press if the diffuser is already
+  // in the requested state, regardless of how that state was reached.
+  if (ReadState() == state) return Status::OK();
 
   const int press_ms = state ? kDiffuserOnPressMs : kDiffuserOffPressMs;
 
-  // ON: briefly short the main button only.
-  auto st = out_->Pulse(true, press_ms, source);
-  if (!st.ok()) return st;
-
-  // OFF: the diffuser requires the main button and the LED-button contacts
-  // to be shorted at the same time. If starting the second pulse fails,
-  // immediately release the first output so we never leave a partial press.
-  if (!state) {
-    st = led_button_out_->Pulse(true, press_ms, source);
-    if (!st.ok()) {
-      out_->SetState(false, "diffuser_off_command_rollback");
-      led_button_out_->SetState(false, "diffuser_off_command_rollback");
-      return st;
-    }
-  }
-
+  // Mark the request pending before touching the output. The output is held
+  // active by this component's timer, then explicitly released in
+  // ButtonPulseCompleteCB(). This keeps the ON and OFF timings on one path.
   pending_state_ = state;
   command_pending_ = true;
   feedback_confirmed_ = false;
   pulse_complete_ = false;
+
+  const auto st = out_->SetState(true, source);
+  if (!st.ok()) {
+    out_->SetState(false, "diffuser_command_rollback");
+    command_pending_ = false;
+    pulse_complete_ = true;
+    return st;
+  }
+
   pulse_duration_timer_.Reset(press_ms, 0);
   command_timeout_timer_.Reset(kCommandTimeoutMs, 0);
-  LOG(LL_INFO,
-      ("Diffuser: requested %s; %s button pulse for %d ms (%s)", OnOff(state),
-       state ? "OUT1 only" : "OUT1 + OUT2 simultaneously", press_ms,
-       source ? source : ""));
+  LOG(LL_INFO, ("Diffuser: requested %s; OUT1 held active for %d ms (%s)",
+                OnOff(state), press_ms, source ? source : ""));
   return Status::OK();
 }
 

@@ -8,8 +8,8 @@ Shelly UNI target.
 
 | Function | Shelly Plus Uni GPIO | Firmware use |
 |---|---:|---|
-| OUT1 | 19 | Main button contact; used for ON and OFF |
-| OUT2 | 21 | LED-button contact; used together with OUT1 for OFF |
+| OUT1 | 19 | Single ON/OFF button contact pair |
+| OUT2 | 21 | Not used by diffuser mode |
 | IN1 | 37 | Not used by diffuser state logic |
 | IN2 | 38 | Atomizer feedback; authoritative ON/OFF state |
 
@@ -21,22 +21,18 @@ The input is configured active-high by default (`on_value = 1`). The existing
 The diffuser is exposed as one HomeKit Switch accessory. Its `On` characteristic
 is always read from IN2. A write to `On` does not directly set the output state:
 
-- ON request while IN2 is OFF: pulse OUT1 active for 100 ms; OUT2 stays inactive.
-- OFF request while IN2 is ON: pulse OUT1 and OUT2 active simultaneously for
-  3000 ms. The diffuser stops only when both button contacts are held closed
-  for the full three seconds.
-- If IN2 already matches the requested state: do not pulse either output.
+- ON request while IN2 is OFF: activate OUT1 for 100 ms.
+- OFF request while IN2 is ON: activate the same OUT1 for 3000 ms.
+- If IN2 already matches the requested state: do not pulse the output.
 - Repeated writes while awaiting feedback do not produce extra pulses.
 - The request remains pending for at most 15 seconds. If IN2 does not confirm
   the requested state, the component logs a warning and continues reporting
   the actual IN2 state.
 - Every IN2 state transition raises a HomeKit notification.
 
-Both outputs are returned to their inactive state after each pulse. OUT2 is
-not a standalone LED indicator in this mode: it simulates the diffuser's
-second (LED) button and is required together with OUT1 for the OFF sequence.
-The firmware never uses either output's current level as the reported diffuser
-state.
+OUT1 is returned to its inactive state after each press. OUT2 is not configured
+or used by this diffuser mode. The firmware never uses the output level as the
+reported diffuser state.
 
 ## Build
 

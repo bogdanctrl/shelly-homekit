@@ -22,13 +22,13 @@
 namespace shelly {
 namespace hap {
 
-// HomeKit switch facade for a diffuser controlled by two button contacts.
-// OUT1 is used for ON; OUT1 and OUT2 together are used for OFF. IN2 is the
-// authoritative source of the diffuser's actual state.
+// HomeKit switch facade for a diffuser controlled by one momentary button.
+// OUT1 is active for 100 ms to turn the diffuser ON and 3000 ms to turn it OFF.
+// IN2 is the authoritative source of the diffuser's actual state.
 class DiffuserSwitch final : public ShellySwitch {
  public:
   DiffuserSwitch(int id, Input *feedback_in, Output *button_out,
-                 Output *led_button_out, struct mgos_config_sw *cfg);
+                 struct mgos_config_sw *cfg);
   ~DiffuserSwitch() override = default;
 
   Status Init() override;
@@ -46,7 +46,6 @@ class DiffuserSwitch final : public ShellySwitch {
   bool ReadState() const;
 
   Input *const feedback_in_;
-  Output *const led_button_out_;
   mgos::hap::Characteristic *on_char_ = nullptr;
   mgos::Timer pulse_duration_timer_;
   mgos::Timer command_timeout_timer_;
