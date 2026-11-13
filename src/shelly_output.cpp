@@ -45,10 +45,11 @@ OutputPin::OutputPin(int id, int pin, int on_value)
       pin_(pin),
       on_value_(on_value),
       pulse_timer_(std::bind(&OutputPin::PulseTimerCB, this)) {
-  mgos_gpio_set_mode(pin_, MGOS_GPIO_MODE_OUTPUT);
 #if CS_PLATFORM != CS_P_ESP8266
-  gpio_hold_dis((gpio_num_t) pin);
+  gpio_hold_dis((gpio_num_t) pin_);
 #endif
+  // Set the inactive level before switching the GPIO to output mode.
+  mgos_gpio_setup_output(pin_, !on_value_);
   LOG(LL_INFO, ("OutputPin %d: pin %d, on_value %d, state %s", id, pin,
                 on_value, OnOff(GetState())));
 }
